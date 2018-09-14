@@ -14,3 +14,4 @@
 !/luaposix-git-*.rockspec
 /luaposix-*.tar.gz
 /TAGS
+.idea/

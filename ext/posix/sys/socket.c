@@ -762,6 +762,12 @@ Psetsockopt(lua_State *L)
 	return pushresult(L, setsockopt(fd, level, optname, val, len), "setsockopt");
 }
 
+// https://github.com/torvalds/linux/blob/master/include/uapi/linux/tcp.h#L176
+#define TCPINFOSIZE 1792
+// https://github.com/torvalds/linux/blob/master/include/uapi/linux/tcp.h#L118
+#define TCP_SAVED_SYN 28
+// http://www.somebits.com/weblog/tech/packetSizes.html
+#define TCPSYNSIZE 48
 
 /***
 Get options on sockets.
@@ -790,6 +796,8 @@ Pgetsockopt(lua_State *L)
 	checknargs(L, 3);
 	struct linger linger;
 	struct timeval tv;
+	char tcpinfo[TCPINFOSIZE];
+	char tcpsyn[TCPSYNSIZE];
 	int err = 0;
 #ifdef SO_BINDTODEVICE
 	char ifname[IFNAMSIZ];
@@ -818,6 +826,21 @@ Pgetsockopt(lua_State *L)
 					len = IFNAMSIZ;
 					break;
 #endif
+				default:
+					break;
+			}
+			break;
+		case IPPROTO_TCP:
+			switch (optname)
+			{
+				case TCP_INFO:
+					val = tcpinfo;
+					len = TCPINFOSIZE;
+					break;
+				case TCP_SAVED_SYN:
+					val = tcpsyn;
+					len = TCPSYNSIZE;
+					break;
 				default:
 					break;
 			}
@@ -853,6 +876,10 @@ Pgetsockopt(lua_State *L)
 		pushintegerfield("l_linger", linger.l_linger);
 		pushintegerfield("l_onoff", linger.l_onoff);
 		settypemetatable("PosixLinger");
+	}
+	else if (val == tcpinfo || val == tcpsyn)
+	{
+		lua_pushlstring(L, val, len);
 	}
 #ifdef SO_BINDTODEVICE
 	else if (val == &ifname)
@@ -1015,6 +1042,7 @@ Any constants not available in the underlying system will be `nil` valued.
 @int SO_SNDLOWAT set send buffer low water mark
 @int SO_SNDTIMEO set send timeout
 @int SO_TYPE get the socket type
+@int TCP_INFO information about TCP connection
 @int TCP_NODELAY don't delay send for packet coalescing
 @usage
   -- Print socket constants supported on this host.
@@ -1078,6 +1106,7 @@ luaopen_posix_sys_socket(lua_State *L)
 	LPOSIX_CONST( SO_SNDLOWAT	);
 	LPOSIX_CONST( SO_TYPE		);
 
+	LPOSIX_CONST( TCP_INFO	);
 	LPOSIX_CONST( TCP_NODELAY	);
 
 # ifdef AI_ADDRCONFIG
